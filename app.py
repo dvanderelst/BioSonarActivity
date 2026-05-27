@@ -15,6 +15,12 @@ EVENT_LABELS = {
     "other": "❓ Other issue",
 }
 
+# Setup-phase widget keys. Streamlit deletes a widget's session_state entry
+# the moment that widget stops being rendered, so once we leave the setup
+# phase these are gone. We snapshot them into RUN_* keys on Start.
+WIDGET_KEYS = ("robot_name", "algorithm", "ears", "duration")
+RUN_KEYS = tuple(f"run_{k}" for k in WIDGET_KEYS)
+
 
 @st.cache_resource
 def get_pool():
@@ -26,13 +32,11 @@ def get_pool():
 def reset_state():
     for key in (
         "phase",
-        "robot_name",
-        "algorithm",
-        "ears",
-        "duration",
         "start_ts",
         "events",
         "submitted_run_id",
+        *WIDGET_KEYS,
+        *RUN_KEYS,
     ):
         st.session_state.pop(key, None)
 
@@ -40,6 +44,10 @@ def reset_state():
 def ensure_state():
     st.session_state.setdefault("phase", "setup")
     st.session_state.setdefault("events", [])
+    st.session_state.setdefault("robot_name", "")
+    st.session_state.setdefault("algorithm", "taxis")
+    st.session_state.setdefault("ears", "aligned")
+    st.session_state.setdefault("duration", DEFAULT_DURATION_SECONDS)
 
 
 def render_setup():
@@ -66,13 +74,16 @@ def render_setup():
         "Duration (seconds)",
         min_value=10,
         max_value=600,
-        value=st.session_state.get("duration", DEFAULT_DURATION_SECONDS),
         step=10,
         key="duration",
     )
 
-    disabled = not st.session_state.get("robot_name", "").strip()
+    disabled = not st.session_state.robot_name.strip()
     if st.button("▶ Start", type="primary", disabled=disabled, use_container_width=True):
+        st.session_state.run_robot_name = st.session_state.robot_name.strip()
+        st.session_state.run_algorithm = st.session_state.algorithm
+        st.session_state.run_ears = st.session_state.ears
+        st.session_state.run_duration = st.session_state.duration
         st.session_state.phase = "running"
         st.session_state.start_ts = time.time()
         st.session_state.events = []
@@ -81,7 +92,8 @@ def render_setup():
 
 def render_running():
     elapsed = time.time() - st.session_state.start_ts
-    remaining = max(0.0, st.session_state.duration - elapsed)
+    duration = st.session_state.run_duration
+    remaining = max(0.0, duration - elapsed)
 
     if remaining <= 0:
         st.session_state.phase = "review"
@@ -92,10 +104,10 @@ def render_running():
         f"<h1 style='text-align:center;font-size:6rem;margin:0'>{mins:02d}:{secs:02d}</h1>",
         unsafe_allow_html=True,
     )
-    st.progress(remaining / st.session_state.duration)
+    st.progress(remaining / duration)
     st.caption(
-        f"Robot **{st.session_state.robot_name}** · "
-        f"{st.session_state.algorithm} · {st.session_state.ears}"
+        f"Robot **{st.session_state.run_robot_name}** · "
+        f"{st.session_state.run_algorithm} · {st.session_state.run_ears}"
     )
 
     cols = st.columns(len(EVENT_LABELS))
@@ -127,9 +139,9 @@ def render_review():
     st.header("Review and submit")
     counts = count_events(st.session_state.events)
     st.markdown(
-        f"**Robot:** {st.session_state.robot_name}  \n"
-        f"**Condition:** {st.session_state.algorithm} × {st.session_state.ears}  \n"
-        f"**Duration:** {st.session_state.duration}s  \n"
+        f"**Robot:** {st.session_state.run_robot_name}  \n"
+        f"**Condition:** {st.session_state.run_algorithm} × {st.session_state.run_ears}  \n"
+        f"**Duration:** {st.session_state.run_duration}s  \n"
         f"**Events logged:** {len(st.session_state.events)}"
     )
 
@@ -143,10 +155,10 @@ def render_review():
             try:
                 run_id = insert_run(
                     get_pool(),
-                    robot_name=st.session_state.robot_name.strip(),
-                    algorithm=st.session_state.algorithm,
-                    ears=st.session_state.ears,
-                    duration_seconds=st.session_state.duration,
+                    robot_name=st.session_state.run_robot_name,
+                    algorithm=st.session_state.run_algorithm,
+                    ears=st.session_state.run_ears,
+                    duration_seconds=st.session_state.run_duration,
                     started_at=datetime.fromtimestamp(
                         st.session_state.start_ts, tz=timezone.utc
                     ),
@@ -167,16 +179,15 @@ def render_review():
 def render_submitted():
     st.success(f"Submitted! Run #{st.session_state.submitted_run_id} saved.")
     if st.button("➕ New run", type="primary", use_container_width=True):
-        # Preserve robot_name and condition selections to make repeated trials easy.
-        robot_name = st.session_state.get("robot_name", "")
-        algorithm = st.session_state.get("algorithm", "taxis")
-        ears = st.session_state.get("ears", "aligned")
-        duration = st.session_state.get("duration", DEFAULT_DURATION_SECONDS)
-        reset_state()
-        st.session_state.robot_name = robot_name
-        st.session_state.algorithm = algorithm
-        st.session_state.ears = ears
-        st.session_state.duration = duration
+        # Pre-fill the setup widgets with values from the run just submitted.
+        st.session_state.robot_name = st.session_state.get("run_robot_name", "")
+        st.session_state.algorithm = st.session_state.get("run_algorithm", "taxis")
+        st.session_state.ears = st.session_state.get("run_ears", "aligned")
+        st.session_state.duration = st.session_state.get(
+            "run_duration", DEFAULT_DURATION_SECONDS
+        )
+        for key in ("phase", "start_ts", "events", "submitted_run_id", *RUN_KEYS):
+            st.session_state.pop(key, None)
         st.rerun()
 
 
