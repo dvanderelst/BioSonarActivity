@@ -55,20 +55,17 @@ def render_setup():
 
     st.text_input("Robot name", key="robot_name", placeholder="e.g. Wall-E")
 
-    col1, col2 = st.columns(2)
-    with col1:
-        st.radio(
-            "Algorithm",
-            options=["taxis", "kinesis"],
-            key="algorithm",
-            captions=["min of 2 sensors, random turn", "compare L/R, turn away from closer"],
-        )
-    with col2:
-        st.radio(
-            "Ear position",
-            options=["aligned", "angled"],
-            key="ears",
-        )
+    st.radio(
+        "Algorithm",
+        options=["taxis", "kinesis"],
+        key="algorithm",
+        captions=["min of 2 sensors, random turn", "compare L/R, turn away from closer"],
+    )
+    st.radio(
+        "Ear position",
+        options=["aligned", "angled"],
+        key="ears",
+    )
 
     st.number_input(
         "Duration (seconds)",
@@ -101,7 +98,8 @@ def render_running():
 
     mins, secs = divmod(int(remaining), 60)
     st.markdown(
-        f"<h1 style='text-align:center;font-size:6rem;margin:0'>{mins:02d}:{secs:02d}</h1>",
+        f"<h1 style='text-align:center;font-size:clamp(3rem,18vw,6rem);margin:0'>"
+        f"{mins:02d}:{secs:02d}</h1>",
         unsafe_allow_html=True,
     )
     st.progress(remaining / duration)
@@ -110,14 +108,16 @@ def render_running():
         f"{st.session_state.run_algorithm} · {st.session_state.run_ears}"
     )
 
-    cols = st.columns(len(EVENT_LABELS))
     counts = count_events(st.session_state.events)
-    for col, (ev_type, label) in zip(cols, EVENT_LABELS.items()):
-        with col:
-            if st.button(label, key=f"btn_{ev_type}", use_container_width=True):
-                st.session_state.events.append((ev_type, elapsed))
-                st.rerun()
-            st.metric(label="count", value=counts[ev_type], label_visibility="collapsed")
+    items = list(EVENT_LABELS.items())
+    for row_start in (0, 2):
+        cols = st.columns(2)
+        for col, (ev_type, label) in zip(cols, items[row_start:row_start + 2]):
+            with col:
+                btn_label = f"{label}  ·  {counts[ev_type]}" if counts[ev_type] else label
+                if st.button(btn_label, key=f"btn_{ev_type}", use_container_width=True):
+                    st.session_state.events.append((ev_type, elapsed))
+                    st.rerun()
 
     st.divider()
     c1, c2 = st.columns([1, 1])
@@ -198,8 +198,18 @@ def count_events(events):
     return counts
 
 
+MOBILE_CSS = """
+<style>
+#MainMenu {visibility: hidden;}
+footer {visibility: hidden;}
+.stButton > button {min-height: 3.25rem; font-size: 1.05rem;}
+</style>
+"""
+
+
 def main():
     st.set_page_config(page_title="Biology Day Logger", page_icon="🤖", layout="centered")
+    st.markdown(MOBILE_CSS, unsafe_allow_html=True)
     st.title("🤖 Biology Day — Robot Logger")
     ensure_state()
 
