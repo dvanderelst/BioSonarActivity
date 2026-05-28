@@ -109,44 +109,40 @@ def render_running():
     )
 
     counts = count_events(st.session_state.events)
-    items = list(EVENT_LABELS.items())
-    for row_start in (0, 2):
-        cols = st.columns(2)
-        for col, (ev_type, label) in zip(cols, items[row_start:row_start + 2]):
-            with col:
-                st.markdown(
-                    "<div style='text-align:center;font-weight:600;"
-                    f"margin:0.5rem 0 0.25rem'>{label}</div>",
-                    unsafe_allow_html=True,
-                )
-                minus_col, cnt_col, plus_col = st.columns([1, 1, 1])
-                with minus_col:
-                    if st.button(
-                        "−",
-                        key=f"sub_{ev_type}",
-                        disabled=counts[ev_type] == 0,
-                        use_container_width=True,
-                    ):
-                        for i in range(len(st.session_state.events) - 1, -1, -1):
-                            if st.session_state.events[i][0] == ev_type:
-                                st.session_state.events.pop(i)
-                                break
-                        st.rerun()
-                cnt_col.markdown(
-                    "<div style='text-align:center;font-size:1.75rem;"
-                    "font-weight:700;line-height:3.25rem'>"
-                    f"{counts[ev_type]}</div>",
-                    unsafe_allow_html=True,
-                )
-                with plus_col:
-                    if st.button(
-                        "+",
-                        key=f"btn_{ev_type}",
-                        use_container_width=True,
-                    ):
-                        st.session_state.events.append((ev_type, elapsed))
-                        st.rerun()
-                st.markdown("<div style='height:0.75rem'></div>", unsafe_allow_html=True)
+    for ev_type, label in EVENT_LABELS.items():
+        st.markdown(
+            "<div style='text-align:center;font-weight:600;"
+            f"margin:0.5rem 0 0.25rem'>{label}</div>",
+            unsafe_allow_html=True,
+        )
+        minus_col, cnt_col, plus_col = st.columns([1, 1, 1])
+        with minus_col:
+            if st.button(
+                "−",
+                key=f"sub_{ev_type}",
+                disabled=counts[ev_type] == 0,
+                use_container_width=True,
+            ):
+                for i in range(len(st.session_state.events) - 1, -1, -1):
+                    if st.session_state.events[i][0] == ev_type:
+                        st.session_state.events.pop(i)
+                        break
+                st.rerun()
+        cnt_col.markdown(
+            "<div style='text-align:center;font-size:1.75rem;"
+            "font-weight:700;line-height:3.25rem'>"
+            f"{counts[ev_type]}</div>",
+            unsafe_allow_html=True,
+        )
+        with plus_col:
+            if st.button(
+                "+",
+                key=f"btn_{ev_type}",
+                use_container_width=True,
+            ):
+                st.session_state.events.append((ev_type, elapsed))
+                st.rerun()
+        st.markdown("<div style='height:0.5rem'></div>", unsafe_allow_html=True)
 
     st.divider()
     c1, c2 = st.columns([1, 1])
@@ -236,6 +232,10 @@ footer {visibility: hidden;}
    mobile keyboards. Tapping outside the field (e.g. tapping Start) still
    commits the value. */
 [data-testid="InputInstructions"] {display: none;}
+/* Keep st.columns rows side-by-side on phones — Streamlit otherwise
+   wraps them when each column gets too narrow, which breaks the
+   [-] count [+] stepper. */
+[data-testid="stHorizontalBlock"] {flex-wrap: nowrap !important;}
 </style>
 """
 
