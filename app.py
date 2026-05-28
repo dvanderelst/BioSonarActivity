@@ -106,20 +106,18 @@ def render_running():
         st.rerun()
 
     st.markdown(
-        "<div style='text-align:center;font-size:1.1rem;font-weight:600;"
-        f"margin:0.25rem 0 0'>🤖 {st.session_state.run_robot_name}</div>",
+        "<div style='text-align:center;font-size:1.15rem;font-weight:600;"
+        f"margin:0.25rem 0'>🤖 {st.session_state.run_robot_name} · "
+        f"{st.session_state.run_algorithm} · {st.session_state.run_ears}</div>",
         unsafe_allow_html=True,
     )
     mins, secs = divmod(int(remaining), 60)
     st.markdown(
-        f"<div style='text-align:center;font-size:clamp(2rem,12vw,4rem);"
+        f"<div style='text-align:center;font-size:clamp(1.75rem,10vw,3rem);"
         f"font-weight:600;line-height:1.1;margin:0'>{mins:02d}:{secs:02d}</div>",
         unsafe_allow_html=True,
     )
     st.progress(remaining / duration)
-    st.caption(
-        f"{st.session_state.run_algorithm} · {st.session_state.run_ears}"
-    )
 
     counts = count_events(st.session_state.events)
     for ev_type, label in EVENT_LABELS.items():
