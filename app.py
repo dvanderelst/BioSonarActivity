@@ -245,8 +245,11 @@ footer {visibility: hidden;}
 [data-testid="InputInstructions"] {display: none;}
 /* Keep st.columns rows side-by-side on phones — Streamlit otherwise
    wraps them when each column gets too narrow, which breaks the
-   [-] count [+] stepper. */
+   [-] count [+] stepper. The min-width:0 lets columns actually
+   shrink to fit; without it the flex item's intrinsic min-width
+   pushes the rightmost button off-screen on narrow viewports. */
 [data-testid="stHorizontalBlock"] {flex-wrap: nowrap !important;}
+[data-testid="stHorizontalBlock"] > div {min-width: 0 !important;}
 /* Hide the audio player UI — we use st.audio only for the end-of-run
    alarm and don't want a visible player on the review page. */
 [data-testid="stAudio"] {display: none;}
