@@ -114,30 +114,39 @@ def render_running():
         cols = st.columns(2)
         for col, (ev_type, label) in zip(cols, items[row_start:row_start + 2]):
             with col:
-                if st.button(label, key=f"btn_{ev_type}", use_container_width=True):
-                    st.session_state.events.append((ev_type, elapsed))
-                    st.rerun()
                 st.markdown(
-                    "<div style='text-align:center;font-size:1.75rem;"
-                    "font-weight:600;line-height:1;margin:0.25rem 0'>"
-                    f"{counts[ev_type]}</div>",
+                    "<div style='text-align:center;font-weight:600;"
+                    f"margin:0.5rem 0 0.25rem'>{label}</div>",
                     unsafe_allow_html=True,
                 )
-                _, sub_col, _ = st.columns([1, 2, 1])
-                with sub_col:
+                minus_col, cnt_col, plus_col = st.columns([1, 1, 1])
+                with minus_col:
                     if st.button(
-                        "−1",
+                        "−",
                         key=f"sub_{ev_type}",
                         disabled=counts[ev_type] == 0,
                         use_container_width=True,
-                        help="Undo last",
                     ):
                         for i in range(len(st.session_state.events) - 1, -1, -1):
                             if st.session_state.events[i][0] == ev_type:
                                 st.session_state.events.pop(i)
                                 break
                         st.rerun()
-                st.markdown("<div style='height:0.5rem'></div>", unsafe_allow_html=True)
+                cnt_col.markdown(
+                    "<div style='text-align:center;font-size:1.75rem;"
+                    "font-weight:700;line-height:3.25rem'>"
+                    f"{counts[ev_type]}</div>",
+                    unsafe_allow_html=True,
+                )
+                with plus_col:
+                    if st.button(
+                        "+",
+                        key=f"btn_{ev_type}",
+                        use_container_width=True,
+                    ):
+                        st.session_state.events.append((ev_type, elapsed))
+                        st.rerun()
+                st.markdown("<div style='height:0.75rem'></div>", unsafe_allow_html=True)
 
     st.divider()
     c1, c2 = st.columns([1, 1])
