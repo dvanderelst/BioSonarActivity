@@ -49,7 +49,7 @@ wheels = [
 ]
 
 [[package]]
-name = "biologydaylogger"
+name = "biosonaractivity"
 version = "0.1.0"
 source = { virtual = "." }
 dependencies = [
