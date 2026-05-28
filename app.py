@@ -260,13 +260,13 @@ footer {visibility: hidden;}
 
 
 def main():
-    st.set_page_config(page_title="Biology Day Logger", page_icon="🤖", layout="centered")
+    st.set_page_config(page_title="BioSonar Activity", page_icon="🦇", layout="centered")
     st.markdown(MOBILE_CSS, unsafe_allow_html=True)
     ensure_state()
 
     phase = st.session_state.phase
     if phase != "running":
-        st.title("🤖 Biology Day — Robot Logger")
+        st.title("🦇 BioSonar Activity")
     if phase == "setup":
         render_setup()
     elif phase == "running":
