@@ -105,15 +105,19 @@ def render_running():
         st.session_state.beep_pending = True
         st.rerun()
 
+    st.markdown(
+        "<div style='text-align:center;font-size:1.1rem;font-weight:600;"
+        f"margin:0.25rem 0 0'>🤖 {st.session_state.run_robot_name}</div>",
+        unsafe_allow_html=True,
+    )
     mins, secs = divmod(int(remaining), 60)
     st.markdown(
-        f"<h1 style='text-align:center;font-size:clamp(3rem,18vw,6rem);margin:0'>"
-        f"{mins:02d}:{secs:02d}</h1>",
+        f"<div style='text-align:center;font-size:clamp(2rem,12vw,4rem);"
+        f"font-weight:600;line-height:1.1;margin:0'>{mins:02d}:{secs:02d}</div>",
         unsafe_allow_html=True,
     )
     st.progress(remaining / duration)
     st.caption(
-        f"Robot **{st.session_state.run_robot_name}** · "
         f"{st.session_state.run_algorithm} · {st.session_state.run_ears}"
     )
 
@@ -260,10 +264,11 @@ footer {visibility: hidden;}
 def main():
     st.set_page_config(page_title="Biology Day Logger", page_icon="🤖", layout="centered")
     st.markdown(MOBILE_CSS, unsafe_allow_html=True)
-    st.title("🤖 Biology Day — Robot Logger")
     ensure_state()
 
     phase = st.session_state.phase
+    if phase != "running":
+        st.title("🤖 Biology Day — Robot Logger")
     if phase == "setup":
         render_setup()
     elif phase == "running":
