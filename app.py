@@ -1,10 +1,13 @@
 import os
 import time
 from datetime import datetime, timezone
+from pathlib import Path
 
 import streamlit as st
 
 from db import _make_pool, init_schema, insert_run
+
+ALARM_PATH = Path(__file__).parent / "resources" / "done.mp3"
 
 DEFAULT_DURATION_SECONDS = int(os.environ.get("DEFAULT_DURATION_SECONDS", "120"))
 
@@ -27,6 +30,11 @@ def get_pool():
     pool = _make_pool()
     init_schema(pool)
     return pool
+
+
+@st.cache_resource
+def load_alarm() -> bytes:
+    return ALARM_PATH.read_bytes()
 
 
 def reset_state():
@@ -94,6 +102,7 @@ def render_running():
 
     if remaining <= 0:
         st.session_state.phase = "review"
+        st.session_state.beep_pending = True
         st.rerun()
 
     mins, secs = divmod(int(remaining), 60)
@@ -162,6 +171,8 @@ def render_running():
 
 def render_review():
     st.header("Review and submit")
+    if st.session_state.pop("beep_pending", False):
+        st.audio(load_alarm(), format="audio/mp3", autoplay=True)
     counts = count_events(st.session_state.events)
     st.markdown(
         f"**Robot:** {st.session_state.run_robot_name}  \n"
@@ -236,6 +247,9 @@ footer {visibility: hidden;}
    wraps them when each column gets too narrow, which breaks the
    [-] count [+] stepper. */
 [data-testid="stHorizontalBlock"] {flex-wrap: nowrap !important;}
+/* Hide the audio player UI — we use st.audio only for the end-of-run
+   alarm and don't want a visible player on the review page. */
+[data-testid="stAudio"] {display: none;}
 </style>
 """
 
