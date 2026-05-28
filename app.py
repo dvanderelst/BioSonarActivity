@@ -114,10 +114,15 @@ def render_running():
         cols = st.columns(2)
         for col, (ev_type, label) in zip(cols, items[row_start:row_start + 2]):
             with col:
-                btn_label = f"{label}  ·  {counts[ev_type]}" if counts[ev_type] else label
-                if st.button(btn_label, key=f"btn_{ev_type}", use_container_width=True):
+                if st.button(label, key=f"btn_{ev_type}", use_container_width=True):
                     st.session_state.events.append((ev_type, elapsed))
                     st.rerun()
+                st.markdown(
+                    "<div style='text-align:center;font-size:1.75rem;"
+                    "font-weight:600;line-height:1;margin:0.25rem 0 0.75rem'>"
+                    f"{counts[ev_type]}</div>",
+                    unsafe_allow_html=True,
+                )
 
     st.divider()
     c1, c2 = st.columns([1, 1])
@@ -203,6 +208,10 @@ MOBILE_CSS = """
 #MainMenu {visibility: hidden;}
 footer {visibility: hidden;}
 .stButton > button {min-height: 3.25rem; font-size: 1.05rem;}
+/* Hide the "Press Enter to apply" hint under text inputs — confusing on
+   mobile keyboards. Tapping outside the field (e.g. tapping Start) still
+   commits the value. */
+[data-testid="InputInstructions"] {display: none;}
 </style>
 """
 
