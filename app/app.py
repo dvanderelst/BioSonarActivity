@@ -4,6 +4,7 @@ from datetime import datetime, timezone
 from pathlib import Path
 
 import streamlit as st
+import streamlit.components.v1 as components
 
 from db import _make_pool, fetch_runs_with_counts, init_schema, insert_run
 from robots import ROBOTS_PATH, load_robots
@@ -273,7 +274,32 @@ def count_events(events):
     return counts
 
 
+def scroll_to_top():
+    # Streamlit keeps the previous scroll position when we switch pages via
+    # session_state, so the dashboard would open scrolled down. This runs a
+    # script in the parent document to jump back to the top. The setTimeout
+    # gives the new page a moment to lay out before we scroll.
+    components.html(
+        """
+        <script>
+            const doc = window.parent.document;
+            const scroll = () => {
+                const main = doc.querySelector(
+                    'section.stMain, [data-testid="stMain"], [data-testid="stAppViewContainer"]'
+                );
+                if (main) main.scrollTo(0, 0);
+                window.parent.scrollTo(0, 0);
+            };
+            scroll();
+            setTimeout(scroll, 50);
+        </script>
+        """,
+        height=0,
+    )
+
+
 def render_dashboard():
+    scroll_to_top()
     st.header("Dashboard")
     if st.button("← Back", use_container_width=False):
         st.session_state.page = "activity"
