@@ -17,7 +17,7 @@ from robots import ROBOTS_PATH, load_robots
 
 ALARM_PATH = Path(__file__).parent / "resources" / "done.mp3"
 
-DEFAULT_DURATION_SECONDS = int(os.environ.get("DEFAULT_DURATION_SECONDS", "120"))
+DEFAULT_DURATION_SECONDS = int(os.environ.get("DEFAULT_DURATION_SECONDS", "300"))
 
 # Password gating the "erase all data" button. Set ERASE_PASSWORD in Railway.
 # If unset, the erase control stays hidden so data can't be wiped by accident.
@@ -149,9 +149,14 @@ def render_running():
         st.rerun()
 
     st.markdown(
-        "<div style='text-align:center;font-size:1.15rem;font-weight:600;"
-        f"margin:0.25rem 0'>{st.session_state.run_robot_name} · "
-        f"{st.session_state.run_algorithm} · {st.session_state.run_ears}</div>",
+        "<div style='text-align:center;font-size:1.35rem;font-weight:700;"
+        f"margin:0.25rem 0 0'>🤖 {st.session_state.run_robot_name}</div>",
+        unsafe_allow_html=True,
+    )
+    st.markdown(
+        "<div style='text-align:center;font-size:0.95rem;opacity:0.7;"
+        f"margin:0 0 0.25rem'>{st.session_state.run_algorithm} · "
+        f"{st.session_state.run_ears}</div>",
         unsafe_allow_html=True,
     )
     mins, secs = divmod(int(remaining), 60)
