@@ -150,7 +150,7 @@ def render_running():
 
     st.markdown(
         "<div style='text-align:center;font-size:1.35rem;font-weight:700;"
-        f"margin:0.25rem 0 0'>🤖 {st.session_state.run_robot_name}</div>",
+        f"margin:0.25rem 0 0'>{st.session_state.run_robot_name}</div>",
         unsafe_allow_html=True,
     )
     st.markdown(
