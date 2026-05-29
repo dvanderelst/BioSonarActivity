@@ -442,6 +442,25 @@ footer {visibility: hidden;}
 /* Hide the audio player UI — we use st.audio only for the end-of-run
    alarm and don't want a visible player on the review page. */
 [data-testid="stAudio"] {display: none;}
+/* Colour the algorithm options to match the robot's lights: taxis = green,
+   kinesis = red. Options render in declaration order (see render_setup), so
+   the 1st radio label is taxis and the 2nd is kinesis. Scoped to this widget
+   via its st-key-<key> wrapper class so no other radios are affected. */
+.st-key-algorithm [role="radiogroup"] label {
+    border-radius: 0.5rem; padding: 0.4rem 0.6rem; margin-bottom: 0.25rem;
+}
+.st-key-algorithm [role="radiogroup"] label:nth-of-type(1) {
+    background: rgba(46, 160, 67, 0.14);
+}
+.st-key-algorithm [role="radiogroup"] label:nth-of-type(1) p {
+    color: #1b7a2f; font-weight: 700;
+}
+.st-key-algorithm [role="radiogroup"] label:nth-of-type(2) {
+    background: rgba(214, 40, 40, 0.14);
+}
+.st-key-algorithm [role="radiogroup"] label:nth-of-type(2) p {
+    color: #c62828; font-weight: 700;
+}
 </style>
 """
 
