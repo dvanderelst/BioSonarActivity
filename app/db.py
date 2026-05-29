@@ -129,6 +129,13 @@ def insert_run(
         return run_id
 
 
+def delete_all_runs(pool: ConnectionPool) -> int:
+    """Delete every run (events cascade). Returns the number of runs removed."""
+    with pool.connection() as conn, conn.cursor() as cur:
+        cur.execute("DELETE FROM runs")
+        return cur.rowcount
+
+
 def fetch_runs_with_counts(pool: ConnectionPool) -> list[dict]:
     """Return all runs with per-event-type counts, newest first."""
     with pool.connection() as conn, conn.cursor() as cur:

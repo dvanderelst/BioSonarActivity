@@ -6,12 +6,22 @@ from pathlib import Path
 import streamlit as st
 import streamlit.components.v1 as components
 
-from db import _make_pool, fetch_runs_with_counts, init_schema, insert_run
+from db import (
+    _make_pool,
+    delete_all_runs,
+    fetch_runs_with_counts,
+    init_schema,
+    insert_run,
+)
 from robots import ROBOTS_PATH, load_robots
 
 ALARM_PATH = Path(__file__).parent / "resources" / "done.mp3"
 
 DEFAULT_DURATION_SECONDS = int(os.environ.get("DEFAULT_DURATION_SECONDS", "120"))
+
+# Password gating the "erase all data" button. Set ERASE_PASSWORD in Railway.
+# If unset, the erase control stays hidden so data can't be wiped by accident.
+ERASE_PASSWORD = os.environ.get("ERASE_PASSWORD", "")
 
 EVENT_LABELS = {
     "hit_wall": "🧱 Hit wall",
@@ -276,22 +286,30 @@ def count_events(events):
 
 def scroll_to_top():
     # Streamlit keeps the previous scroll position when we switch pages via
-    # session_state, so the dashboard would open scrolled down. This runs a
-    # script in the parent document to jump back to the top. The setTimeout
-    # gives the new page a moment to lay out before we scroll.
+    # session_state, so the dashboard would open scrolled down. This component
+    # is injected at the very top of the dashboard, so scrolling the iframe
+    # itself into view drags the parent page to the top — robust across
+    # Streamlit versions and mobile browsers without guessing which element
+    # actually scrolls. We also poke the likely scroll containers directly,
+    # and retry a few times because mobile layout settles after first paint.
     components.html(
         """
         <script>
-            const doc = window.parent.document;
-            const scroll = () => {
-                const main = doc.querySelector(
-                    'section.stMain, [data-testid="stMain"], [data-testid="stAppViewContainer"]'
-                );
-                if (main) main.scrollTo(0, 0);
-                window.parent.scrollTo(0, 0);
+            const win = window.parent;
+            const doc = win.document;
+            const frame = window.frameElement;
+            const toTop = () => {
+                if (frame && frame.scrollIntoView) {
+                    frame.scrollIntoView({block: "start"});
+                }
+                win.scrollTo(0, 0);
+                const sel = 'section.stMain, [data-testid="stMain"],'
+                    + ' [data-testid="stAppViewContainer"], .main, .appview-container';
+                doc.querySelectorAll(sel).forEach((el) => { el.scrollTop = 0; });
+                doc.documentElement.scrollTop = 0;
+                doc.body.scrollTop = 0;
             };
-            scroll();
-            setTimeout(scroll, 50);
+            [0, 100, 300, 600].forEach((t) => setTimeout(toTop, t));
         </script>
         """,
         height=0,
@@ -304,6 +322,9 @@ def render_dashboard():
     if st.button("← Back", use_container_width=False):
         st.session_state.page = "activity"
         st.rerun()
+
+    if msg := st.session_state.pop("erase_msg", None):
+        st.success(msg)
 
     try:
         rows = fetch_runs_with_counts(get_pool())
@@ -341,6 +362,7 @@ def render_dashboard():
     agg_rows = []
     for (algo, ears), b in sorted(buckets.items()):
         elapsed = b["elapsed"] or 1.0  # avoid div by zero
+        total = b["hit_wall"] + b["hit_robot"] + b["stuck"] + b["other"]
         agg_rows.append({
             "algorithm": algo,
             "ears": ears,
@@ -350,6 +372,8 @@ def render_dashboard():
             "robot /s": round(b["hit_robot"] / elapsed, 4),
             "stuck /s": round(b["stuck"]     / elapsed, 4),
             "other /s": round(b["other"]     / elapsed, 4),
+            "total /s": round(total / elapsed, 4),
+            "events": total,
         })
     st.dataframe(agg_rows, use_container_width=True, hide_index=True)
 
@@ -372,6 +396,31 @@ def render_dashboard():
             "hits/s": round(r["total_events"] / elapsed, 4),
         })
     st.dataframe(run_rows, use_container_width=True, hide_index=True)
+
+    render_erase()
+
+
+def render_erase():
+    # Hidden entirely unless ERASE_PASSWORD is configured, so the destructive
+    # control can't be reached on a deployment that hasn't opted in.
+    if not ERASE_PASSWORD:
+        return
+    st.divider()
+    with st.expander("⚠️ Erase all data"):
+        st.warning("This permanently deletes every run and all logged events.")
+        pw = st.text_input("Password", type="password", key="erase_pw")
+        if st.button("🗑 Erase all data", type="primary", use_container_width=True):
+            if pw == ERASE_PASSWORD:
+                try:
+                    n = delete_all_runs(get_pool())
+                except Exception as exc:
+                    st.error(f"Erase failed: {exc}")
+                else:
+                    st.session_state.pop("erase_pw", None)
+                    st.session_state.erase_msg = f"Erased {n} run(s)."
+                    st.rerun()
+            else:
+                st.error("Incorrect password.")
 
 
 MOBILE_CSS = """
