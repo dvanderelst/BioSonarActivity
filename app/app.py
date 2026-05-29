@@ -432,12 +432,17 @@ MOBILE_CSS = """
 <style>
 #MainMenu {visibility: hidden;}
 footer {visibility: hidden;}
+/* Hide Streamlit's fixed top header bar. It overlaps page content once we
+   shrink the top padding below its ~3.75rem height — which was hiding the
+   robot name (the first element on the running screen) behind it. We already
+   hide the menu and footer, so this is consistent kiosk styling. */
+[data-testid="stHeader"] {display: none;}
 /* Tighten Streamlit's default vertical rhythm so a page fits on a phone
    screen without scrolling. Streamlit reserves ~6rem of top padding for the
-   header bar and puts a 1rem gap between every element; both are wasteful on
-   mobile. */
+   header bar (now hidden) and puts a 1rem gap between every element; both are
+   wasteful on mobile. */
 [data-testid="stMainBlockContainer"] {
-    padding-top: 1.5rem; padding-bottom: 2rem;
+    padding-top: 2rem; padding-bottom: 2rem;
 }
 [data-testid="stMain"] [data-testid="stVerticalBlock"] {
     gap: 0.5rem;
