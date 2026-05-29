@@ -6,7 +6,7 @@ This is the repo for the biosonar activity I developed for Biology. I also used 
 
 - The app is deployed at https://biosonaractivity.up.railway.app
 - `BioSonarActivity.mblock` is the software to run on the robots.
-- The presentation lives here: https://docs.google.com/presentation/d/182DXDO3G-f-dD9RArnrlMGMrLojtmj-Yze1J_GHO8wE/edit?slide=id.p#slide=id.p
+- Google Drive materials live here: https://drive.google.com/drive/folders/1a3XlhUuNvmDO4PrVZ0wZsFaPWXlfxDUB?usp=drive_link
 
 ## Goals
 

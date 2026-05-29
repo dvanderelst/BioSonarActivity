@@ -5,7 +5,8 @@ from pathlib import Path
 
 import streamlit as st
 
-from db import _make_pool, init_schema, insert_run
+from db import _make_pool, fetch_runs_with_counts, init_schema, insert_run
+from robots import ROBOTS_PATH, load_robots
 
 ALARM_PATH = Path(__file__).parent / "resources" / "done.mp3"
 
@@ -21,8 +22,19 @@ EVENT_LABELS = {
 # Setup-phase widget keys. Streamlit deletes a widget's session_state entry
 # the moment that widget stops being rendered, so once we leave the setup
 # phase these are gone. We snapshot them into RUN_* keys on Start.
-WIDGET_KEYS = ("robot_name", "algorithm", "ears", "duration")
+WIDGET_KEYS = ("robot_number", "algorithm", "duration")
 RUN_KEYS = tuple(f"run_{k}" for k in WIDGET_KEYS)
+
+
+@st.cache_data
+def get_robots(_mtime: float) -> list[dict]:
+    # _mtime is part of the cache key so edits to robots.ods invalidate
+    # the cache without a process restart.
+    return load_robots()
+
+
+def robots_now() -> list[dict]:
+    return get_robots(ROBOTS_PATH.stat().st_mtime)
 
 
 @st.cache_resource
@@ -41,6 +53,7 @@ def reset_state():
     for key in (
         "phase",
         "start_ts",
+        "elapsed_at_stop",
         "events",
         "submitted_run_id",
         *WIDGET_KEYS,
@@ -50,29 +63,41 @@ def reset_state():
 
 
 def ensure_state():
+    st.session_state.setdefault("page", "activity")
     st.session_state.setdefault("phase", "setup")
     st.session_state.setdefault("events", [])
-    st.session_state.setdefault("robot_name", "")
     st.session_state.setdefault("algorithm", "taxis")
-    st.session_state.setdefault("ears", "aligned")
     st.session_state.setdefault("duration", DEFAULT_DURATION_SECONDS)
 
 
 def render_setup():
     st.header("Set up a run")
 
-    st.text_input("Robot name", key="robot_name", placeholder="e.g. Wall-E")
+    robots = robots_now()
+    numbers = [r["number"] for r in robots]
+    by_number = {r["number"]: r for r in robots}
+
+    # Drop a stale selection (e.g. if the roster was edited between sessions).
+    if st.session_state.get("robot_number") not in by_number:
+        st.session_state.pop("robot_number", None)
+
+    def _label(n: int) -> str:
+        r = by_number[n]
+        return f"#{r['number']:02d} — {r['name']} ({r['ears']})"
+
+    st.selectbox(
+        "Robot",
+        options=numbers,
+        key="robot_number",
+        format_func=_label,
+    )
+    selected = by_number[st.session_state.robot_number]
 
     st.radio(
         "Algorithm",
         options=["taxis", "kinesis"],
         key="algorithm",
         captions=["min of 2 sensors, random turn", "compare L/R, turn away from closer"],
-    )
-    st.radio(
-        "Ear position",
-        options=["aligned", "angled"],
-        key="ears",
     )
 
     st.number_input(
@@ -83,15 +108,21 @@ def render_setup():
         key="duration",
     )
 
-    disabled = not st.session_state.robot_name.strip()
-    if st.button("▶ Start", type="primary", disabled=disabled, use_container_width=True):
-        st.session_state.run_robot_name = st.session_state.robot_name.strip()
+    if st.button("▶ Start", type="primary", use_container_width=True):
+        st.session_state.run_robot_name = selected["name"]
         st.session_state.run_algorithm = st.session_state.algorithm
-        st.session_state.run_ears = st.session_state.ears
+        st.session_state.run_ears = selected["ears"]
         st.session_state.run_duration = st.session_state.duration
+        st.session_state.run_robot_number = selected["number"]
         st.session_state.phase = "running"
         st.session_state.start_ts = time.time()
         st.session_state.events = []
+        st.session_state.pop("elapsed_at_stop", None)
+        st.rerun()
+
+    st.divider()
+    if st.button("📊 Dashboard", use_container_width=True):
+        st.session_state.page = "dashboard"
         st.rerun()
 
 
@@ -101,6 +132,7 @@ def render_running():
     remaining = max(0.0, duration - elapsed)
 
     if remaining <= 0:
+        st.session_state.elapsed_at_stop = min(elapsed, float(duration))
         st.session_state.phase = "review"
         st.session_state.beep_pending = True
         st.rerun()
@@ -159,6 +191,7 @@ def render_running():
     c1, c2 = st.columns([1, 1])
     with c1:
         if st.button("⏭ End early", use_container_width=True):
+            st.session_state.elapsed_at_stop = time.time() - st.session_state.start_ts
             st.session_state.phase = "review"
             st.rerun()
     with c2:
@@ -176,10 +209,13 @@ def render_review():
     if st.session_state.pop("beep_pending", False):
         st.audio(load_alarm(), format="audio/mp3", autoplay=True)
     counts = count_events(st.session_state.events)
+    elapsed = st.session_state.get(
+        "elapsed_at_stop", float(st.session_state.run_duration)
+    )
     st.markdown(
         f"**Robot:** {st.session_state.run_robot_name}  \n"
         f"**Condition:** {st.session_state.run_algorithm} × {st.session_state.run_ears}  \n"
-        f"**Duration:** {st.session_state.run_duration}s  \n"
+        f"**Duration set / ran:** {st.session_state.run_duration}s / {elapsed:.1f}s  \n"
         f"**Events logged:** {len(st.session_state.events)}"
     )
 
@@ -197,6 +233,7 @@ def render_review():
                     algorithm=st.session_state.run_algorithm,
                     ears=st.session_state.run_ears,
                     duration_seconds=st.session_state.run_duration,
+                    elapsed_seconds=elapsed,
                     started_at=datetime.fromtimestamp(
                         st.session_state.start_ts, tz=timezone.utc
                     ),
@@ -218,9 +255,9 @@ def render_submitted():
     st.success(f"Submitted! Run #{st.session_state.submitted_run_id} saved.")
     if st.button("➕ New run", type="primary", use_container_width=True):
         # Pre-fill the setup widgets with values from the run just submitted.
-        st.session_state.robot_name = st.session_state.get("run_robot_name", "")
+        if "run_robot_number" in st.session_state:
+            st.session_state.robot_number = st.session_state.run_robot_number
         st.session_state.algorithm = st.session_state.get("run_algorithm", "taxis")
-        st.session_state.ears = st.session_state.get("run_ears", "aligned")
         st.session_state.duration = st.session_state.get(
             "run_duration", DEFAULT_DURATION_SECONDS
         )
@@ -234,6 +271,81 @@ def count_events(events):
     for ev_type, _ in events:
         counts[ev_type] = counts.get(ev_type, 0) + 1
     return counts
+
+
+def render_dashboard():
+    st.header("Dashboard")
+    if st.button("← Back", use_container_width=False):
+        st.session_state.page = "activity"
+        st.rerun()
+
+    try:
+        rows = fetch_runs_with_counts(get_pool())
+    except Exception as exc:
+        st.error(f"Could not load runs: {exc}")
+        return
+
+    if not rows:
+        st.info("No runs submitted yet.")
+        return
+
+    total_runs = len(rows)
+    total_elapsed = sum(r["elapsed_seconds"] for r in rows)
+    total_events = sum(r["total_events"] for r in rows)
+    m1, m2, m3 = st.columns(3)
+    m1.metric("Runs", total_runs)
+    m2.metric("Total time", f"{total_elapsed / 60:.1f} min")
+    m3.metric("Events", total_events)
+
+    st.subheader("By condition")
+    # Aggregate: mean events/sec per (algorithm, ears) per event type.
+    buckets: dict[tuple[str, str], dict] = {}
+    for r in rows:
+        key = (r["algorithm"], r["ears"])
+        b = buckets.setdefault(
+            key,
+            {"runs": 0, "elapsed": 0.0,
+             "hit_wall": 0, "hit_robot": 0, "stuck": 0, "other": 0},
+        )
+        b["runs"] += 1
+        b["elapsed"] += r["elapsed_seconds"]
+        for ev in EVENT_LABELS:
+            b[ev] += r[ev]
+
+    agg_rows = []
+    for (algo, ears), b in sorted(buckets.items()):
+        elapsed = b["elapsed"] or 1.0  # avoid div by zero
+        agg_rows.append({
+            "algorithm": algo,
+            "ears": ears,
+            "runs": b["runs"],
+            "elapsed (s)": round(b["elapsed"], 1),
+            "wall /s":  round(b["hit_wall"]  / elapsed, 4),
+            "robot /s": round(b["hit_robot"] / elapsed, 4),
+            "stuck /s": round(b["stuck"]     / elapsed, 4),
+            "other /s": round(b["other"]     / elapsed, 4),
+        })
+    st.dataframe(agg_rows, use_container_width=True, hide_index=True)
+
+    st.subheader("Runs")
+    run_rows = []
+    for r in rows:
+        elapsed = r["elapsed_seconds"] or 1.0
+        run_rows.append({
+            "id": r["id"],
+            "started": r["started_at"].strftime("%Y-%m-%d %H:%M"),
+            "robot name": r["robot_name"],
+            "algorithm": r["algorithm"],
+            "ears": r["ears"],
+            "set (s)": r["duration_seconds"],
+            "ran (s)": round(r["elapsed_seconds"], 1),
+            "wall": r["hit_wall"],
+            "hit robot": r["hit_robot"],
+            "stuck": r["stuck"],
+            "other": r["other"],
+            "hits/s": round(r["total_events"] / elapsed, 4),
+        })
+    st.dataframe(run_rows, use_container_width=True, hide_index=True)
 
 
 MOBILE_CSS = """
@@ -263,6 +375,11 @@ def main():
     st.set_page_config(page_title="BioSonar Activity", page_icon="🦇", layout="centered")
     st.markdown(MOBILE_CSS, unsafe_allow_html=True)
     ensure_state()
+
+    if st.session_state.page == "dashboard":
+        st.title("🦇 BioSonar Activity")
+        render_dashboard()
+        return
 
     phase = st.session_state.phase
     if phase != "running":
