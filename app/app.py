@@ -427,6 +427,20 @@ MOBILE_CSS = """
 <style>
 #MainMenu {visibility: hidden;}
 footer {visibility: hidden;}
+/* Tighten Streamlit's default vertical rhythm so a page fits on a phone
+   screen without scrolling. Streamlit reserves ~6rem of top padding for the
+   header bar and puts a 1rem gap between every element; both are wasteful on
+   mobile. */
+[data-testid="stMainBlockContainer"] {
+    padding-top: 1.5rem; padding-bottom: 2rem;
+}
+[data-testid="stMain"] [data-testid="stVerticalBlock"] {
+    gap: 0.5rem;
+}
+[data-testid="stHeading"] {margin-bottom: 0.25rem;}
+h1 {font-size: 1.6rem; padding: 0;}
+h2 {font-size: 1.25rem; padding-top: 0.25rem;}
+hr {margin: 0.5rem 0;}
 .stButton > button {min-height: 3.25rem; font-size: 1.05rem;}
 /* Hide the "Press Enter to apply" hint under text inputs — confusing on
    mobile keyboards. Tapping outside the field (e.g. tapping Start) still
